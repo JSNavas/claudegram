@@ -24,14 +24,13 @@ PROD_PATTERNS=(
   "npm start"
 )
 
-function list_pids() {
-  local -a patterns
-  if [[ "${MODE}" == "prod" ]]; then
-    patterns=("${PROD_PATTERNS[@]}")
-  else
-    patterns=("${DEV_PATTERNS[@]}")
-  fi
+ALL_PATTERNS=(
+  "${DEV_PATTERNS[@]}"
+  "${PROD_PATTERNS[@]}"
+)
 
+function list_pids_for_patterns() {
+  local -a patterns=("$@")
   local pids=()
   for pattern in "${patterns[@]}"; do
     while IFS= read -r pid; do
@@ -43,8 +42,21 @@ function list_pids() {
     return 1
   fi
 
-  # Unique + sort
   printf "%s\n" "${pids[@]}" | sort -u
+}
+
+function list_pids() {
+  local -a patterns
+  if [[ "${MODE}" == "prod" ]]; then
+    patterns=("${PROD_PATTERNS[@]}")
+  else
+    patterns=("${DEV_PATTERNS[@]}")
+  fi
+  list_pids_for_patterns "${patterns[@]}"
+}
+
+function list_pids_all() {
+  list_pids_for_patterns "${ALL_PATTERNS[@]}"
 }
 
 function status() {
@@ -63,6 +75,18 @@ function wait_for_stop() {
   local end=$((SECONDS + timeout))
   while (( SECONDS < end )); do
     if ! list_pids >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.5
+  done
+  return 1
+}
+
+function wait_for_stop_all() {
+  local timeout="${1:-10}"
+  local end=$((SECONDS + timeout))
+  while (( SECONDS < end )); do
+    if ! list_pids_all >/dev/null 2>&1; then
       return 0
     fi
     sleep 0.5
@@ -103,6 +127,27 @@ function stop() {
   fi
 }
 
+function stop_all() {
+  if ! pids=$(list_pids_all 2>/dev/null); then
+    echo "No Claudegram processes found."
+    return 0
+  fi
+
+  echo "Stopping all Claudegram processes..."
+  echo "${pids}" | xargs -r kill -TERM
+  sleep 1
+
+  if pids_after=$(list_pids_all 2>/dev/null); then
+    echo "Force killing remaining PIDs:"
+    echo "${pids_after}" | sed 's/^/  PID: /'
+    echo "${pids_after}" | xargs -r kill -KILL
+  fi
+
+  if ! wait_for_stop_all 10; then
+    echo "Warning: Claudegram processes did not fully stop within timeout."
+  fi
+}
+
 function start() {
   if status >/dev/null 2>&1; then
     echo "Claudegram (${MODE}) already running."
@@ -126,7 +171,7 @@ function start() {
 }
 
 function recover() {
-  stop
+  stop_all
   start
 }
 
@@ -141,17 +186,20 @@ case "${ACTION}" in
     stop
     ;;
   restart)
-    stop
+    stop_all
     start
     ;;
   recover)
     recover
     ;;
+  stop-all)
+    stop_all
+    ;;
   log)
     tail -n 50 "${LOG_FILE}"
     ;;
   *)
-    echo "Usage: $(basename "$0") [dev|prod] {status|start|stop|restart|recover|log}"
+    echo "Usage: $(basename "$0") [dev|prod] {status|start|stop|stop-all|restart|recover|log}"
     exit 1
     ;;
 esac
