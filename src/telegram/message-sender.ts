@@ -272,29 +272,28 @@ export class MessageSender {
               firstPart,
               { parse_mode: 'MarkdownV2' }
             );
-          } catch (mdError) {
-            // If MarkdownV2 fails, try plain text
-            console.error('MarkdownV2 edit failed:', mdError);
-            await ctx.api.editMessageText(
-              chatId,
-              state.messageId,
-              finalContent.substring(0, config.MAX_MESSAGE_LENGTH) || 'Done.',
-              { parse_mode: undefined }
-            );
-          }
 
-          // Send additional messages for remaining parts
-          for (let i = 1; i < parts.length; i++) {
-            try {
-              await ctx.reply(parts[i], { parse_mode: 'MarkdownV2' });
-            } catch (partError) {
-              console.error(`MarkdownV2 failed for part ${i + 1}:`, partError);
-              // Fallback to plain text for this part
-              await ctx.reply(parts[i], { parse_mode: undefined });
+            // Send additional messages for remaining parts
+            for (let i = 1; i < parts.length; i++) {
+              try {
+                await ctx.reply(parts[i], { parse_mode: 'MarkdownV2' });
+              } catch (partError) {
+                console.error(`MarkdownV2 failed for part ${i + 1}:`, partError);
+                await ctx.reply(parts[i], { parse_mode: undefined });
+              }
+              await new Promise(resolve => setTimeout(resolve, 100));
             }
+          } catch (mdError) {
+            // MarkdownV2 failed — delete streaming placeholder and
+            // re-send via sendMessage which handles Telegraph + chunking
+            console.error('MarkdownV2 edit failed, falling back to sendMessage:', mdError);
+            try {
+              await ctx.api.deleteMessage(chatId, state.messageId);
+            } catch { /* ignore */ }
 
-            // Small delay between messages to maintain order
-            await new Promise(resolve => setTimeout(resolve, 100));
+            this.streamStates.delete(chatId);
+            await this.sendMessage(ctx, finalContent);
+            return;
           }
         } catch (error) {
           console.error('Error finishing stream:', error);

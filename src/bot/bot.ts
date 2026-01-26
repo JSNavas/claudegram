@@ -10,6 +10,8 @@ import {
   handleStatus,
   handleMode,
   handleModeCallback,
+  handleTTS,
+  handleTTSCallback,
   handlePing,
   handleCancel,
   handleCommands,
@@ -24,8 +26,11 @@ import {
   handleSessions,
   handleFile,
   handleTelegraph,
+  handleReddit,
 } from './handlers/command.handler.js';
 import { handleMessage } from './handlers/message.handler.js';
+import { handleVoice } from './handlers/voice.handler.js';
+import { handlePhoto, handleImageDocument } from './handlers/photo.handler.js';
 
 export async function createBot(): Promise<Bot> {
   const bot = new Bot(config.TELEGRAM_BOT_TOKEN);
@@ -41,11 +46,13 @@ export async function createBot(): Promise<Bot> {
     { command: 'telegraph', description: '📄 View markdown with Instant View' },
     { command: 'model', description: '🤖 Switch AI model' },
     { command: 'mode', description: '⚙️ Toggle streaming mode' },
+    { command: 'tts', description: '🔊 Toggle voice replies' },
     { command: 'plan', description: '📋 Start planning mode' },
     { command: 'explore', description: '🔍 Explore codebase' },
     { command: 'loop', description: '🔄 Run in loop mode' },
     { command: 'sessions', description: '📚 View saved sessions' },
     { command: 'resume', description: '▶️ Resume a session' },
+    { command: 'reddit', description: '📡 Fetch Reddit posts & subreddits' },
     { command: 'commands', description: '📜 List all commands' },
   ]).then(() => {
     console.log('📋 Command menu registered');
@@ -63,6 +70,7 @@ export async function createBot(): Promise<Bot> {
   bot.command('newproject', handleNewProject);
   bot.command('status', handleStatus);
   bot.command('mode', handleMode);
+  bot.command('tts', handleTTS);
 
   // New commands
   bot.command('ping', handlePing);
@@ -84,6 +92,9 @@ export async function createBot(): Promise<Bot> {
   bot.command('file', handleFile);
   bot.command('telegraph', handleTelegraph);
 
+  // Reddit
+  bot.command('reddit', handleReddit);
+
   // Callback query handler for inline keyboards
   bot.on('callback_query:data', async (ctx) => {
     const data = ctx.callbackQuery.data;
@@ -94,10 +105,19 @@ export async function createBot(): Promise<Bot> {
       await handleModelCallback(ctx);
     } else if (data.startsWith('mode:')) {
       await handleModeCallback(ctx);
+    } else if (data.startsWith('tts:')) {
+      await handleTTSCallback(ctx);
     } else if (data.startsWith('clear:')) {
       await handleClearCallback(ctx);
     }
   });
+
+  // Handle voice messages
+  bot.on('message:voice', handleVoice);
+
+  // Handle images
+  bot.on('message:photo', handlePhoto);
+  bot.on('message:document', handleImageDocument);
 
   // Handle regular text messages
   bot.on('message:text', handleMessage);

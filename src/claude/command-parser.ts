@@ -63,8 +63,13 @@ export function getAvailableCommands(): string {
 • \`/file <path>\` \\- Download a file from project
 • \`/telegraph <path>\` \\- View markdown with Instant View
 
+*Reddit Commands:*
+
+• \`/reddit <target>\` \\- Fetch Reddit posts, subreddits, or user profiles
+
 *Bot Commands:*
 
+• \`/tts\` \\- Toggle voice replies
 • \`/ping\` \\- Check if bot is responsive
 • \`/cancel\` \\- Cancel current request
 • \`/mode\` \\- Toggle streaming mode`;

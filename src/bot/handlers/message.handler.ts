@@ -13,7 +13,8 @@ import {
 import { isClaudeCommand } from '../../claude/command-parser.js';
 import { escapeMarkdownV2 } from '../../telegram/markdown.js';
 import { createTelegraphFromFile } from '../../telegram/telegraph.js';
-import { getStreamingMode } from './command.handler.js';
+import { getStreamingMode, executeRedditFetch } from './command.handler.js';
+import { maybeSendVoiceReply } from '../../tts/voice-reply.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -81,6 +82,12 @@ export async function handleMessage(ctx: Context): Promise<void> {
     // Handle loop mode reply
     if (replyText.includes('Loop Mode') || replyText.includes('work iteratively')) {
       await handleAgentReply(ctx, chatId, text, 'loop');
+      return;
+    }
+
+    // Handle reddit fetch reply
+    if (replyText.includes('Reddit Fetch') || replyText.includes('Reddit target')) {
+      await executeRedditFetch(ctx, text.trim());
       return;
     }
   }
@@ -261,6 +268,7 @@ async function handleAgentReply(
         }
 
         await messageSender.finishStreaming(ctx, response.text);
+        await maybeSendVoiceReply(ctx, response.text);
       } catch (error) {
         await messageSender.cancelStreaming(ctx);
         throw error;
@@ -351,6 +359,7 @@ async function handleStreamingResponse(
     });
 
     await messageSender.finishStreaming(ctx, response.text);
+    await maybeSendVoiceReply(ctx, response.text);
   } catch (error) {
     await messageSender.cancelStreaming(ctx);
     throw error;
@@ -370,4 +379,5 @@ async function handleWaitResponse(
 
   const response = await sendToAgent(chatId, message, { abortController });
   await messageSender.sendMessage(ctx, response.text);
+  await maybeSendVoiceReply(ctx, response.text);
 }

@@ -23,6 +23,7 @@
     "@anthropic-ai/claude-code": "^1.0.3",
     "dotenv": "^16.4.7",
     "grammy": "^1.31.3",
+    "openai": "^6.16.0",
     "telegra.ph": "^1.0.1",
     "telegram-markdown-v2": "^0.0.4",
     "zod": "^3.24.1"
