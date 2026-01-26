@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+LOG_FILE="${ROOT_DIR}/claudegram.dev.log"
+
+MODE="${MODE:-dev}"
+ACTION="${1:-status}"
+if [[ "${ACTION}" == "dev" || "${ACTION}" == "prod" ]]; then
+  MODE="${ACTION}"
+  ACTION="${2:-status}"
+fi
+
+DEV_PATTERNS=(
+  "tsx watch src/index.ts"
+  "node .*claudegram/node_modules/.bin/tsx"
+  "tsx/dist/loader"
+  "npm run dev"
+  "npm exec tsx watch src/index.ts"
+)
+
+PROD_PATTERNS=(
+  "node .*dist/index.js"
+  "npm start"
+)
+
+function list_pids() {
+  local -a patterns
+  if [[ "${MODE}" == "prod" ]]; then
+    patterns=("${PROD_PATTERNS[@]}")
+  else
+    patterns=("${DEV_PATTERNS[@]}")
+  fi
+
+  local pids=()
+  for pattern in "${patterns[@]}"; do
+    while IFS= read -r pid; do
+      [[ -n "${pid}" ]] && pids+=("${pid}")
+    done < <(pgrep -f "${pattern}" || true)
+  done
+
+  if [[ "${#pids[@]}" -eq 0 ]]; then
+    return 1
+  fi
+
+  # Unique + sort
+  printf "%s\n" "${pids[@]}" | sort -u
+}
+
+function status() {
+  if pids=$(list_pids 2>/dev/null); then
+    echo "Claudegram (${MODE}) is running:"
+    echo "${pids}" | sed 's/^/  PID: /'
+    return 0
+  fi
+
+  echo "Claudegram (${MODE}) is not running."
+  return 1
+}
+
+function stop() {
+  if ! pids=$(list_pids 2>/dev/null); then
+    echo "No Claudegram (${MODE}) process found."
+    return 0
+  fi
+
+  echo "Stopping Claudegram (${MODE})..."
+  echo "${pids}" | xargs -r kill -TERM
+  sleep 1
+
+  if pids_after=$(list_pids 2>/dev/null); then
+    echo "Force killing remaining PIDs:"
+    echo "${pids_after}" | sed 's/^/  PID: /'
+    echo "${pids_after}" | xargs -r kill -KILL
+  fi
+}
+
+function start() {
+  if status >/dev/null 2>&1; then
+    echo "Claudegram (${MODE}) already running."
+    status
+    return 0
+  fi
+
+  echo "Starting Claudegram (${MODE})..."
+  cd "${ROOT_DIR}"
+  if [[ "${MODE}" == "prod" ]]; then
+    nohup npm start > "${LOG_FILE}" 2>&1 &
+  else
+    nohup npm run dev > "${LOG_FILE}" 2>&1 &
+  fi
+
+  sleep 1
+  status || true
+  echo "Log: ${LOG_FILE}"
+}
+
+function recover() {
+  stop
+  start
+}
+
+case "${ACTION}" in
+  status)
+    status
+    ;;
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  restart)
+    stop
+    start
+    ;;
+  recover)
+    recover
+    ;;
+  log)
+    tail -n 50 "${LOG_FILE}"
+    ;;
+  *)
+    echo "Usage: $(basename "$0") [dev|prod] {status|start|stop|restart|recover|log}"
+    exit 1
+    ;;
+esac
