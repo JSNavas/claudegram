@@ -1,7 +1,12 @@
 import { config as loadEnv } from 'dotenv';
 import { z } from 'zod';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 
-loadEnv();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const defaultEnvPath = path.resolve(__dirname, '..', '.env');
+const envPath = process.env.CLAUDEGRAM_ENV_PATH || defaultEnvPath;
+loadEnv({ path: envPath });
 
 const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().min(1, 'Telegram bot token is required'),

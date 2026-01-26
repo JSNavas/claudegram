@@ -12,6 +12,8 @@ import {
   handleModeCallback,
   handleTTS,
   handleTTSCallback,
+  handleBotStatus,
+  handleRestartBot,
   handlePing,
   handleCancel,
   handleCommands,
@@ -47,6 +49,8 @@ export async function createBot(): Promise<Bot> {
     { command: 'model', description: '🤖 Switch AI model' },
     { command: 'mode', description: '⚙️ Toggle streaming mode' },
     { command: 'tts', description: '🔊 Toggle voice replies' },
+    { command: 'botstatus', description: '🩺 Show bot process status' },
+    { command: 'restartbot', description: '🔁 Restart the bot' },
     { command: 'plan', description: '📋 Start planning mode' },
     { command: 'explore', description: '🔍 Explore codebase' },
     { command: 'loop', description: '🔄 Run in loop mode' },
@@ -71,6 +75,8 @@ export async function createBot(): Promise<Bot> {
   bot.command('status', handleStatus);
   bot.command('mode', handleMode);
   bot.command('tts', handleTTS);
+  bot.command('botstatus', handleBotStatus);
+  bot.command('restartbot', handleRestartBot);
 
   // New commands
   bot.command('ping', handlePing);

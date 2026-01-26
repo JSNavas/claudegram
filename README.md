@@ -172,6 +172,8 @@ No extra setup required. Images sent in chat are saved to:
 | Command | Description |
 |---------|-------------|
 | `/ping` | Check if bot is responsive |
+| `/botstatus` | Show bot process status |
+| `/restartbot` | Restart the bot process |
 | `/cancel` | Cancel the current request |
 | `/commands` | Show all available commands |
 
@@ -189,6 +191,7 @@ All configuration is via environment variables. See `.env.example` for the full 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ANTHROPIC_API_KEY` | — | Anthropic API key (optional if using Claude Max) |
+| `CLAUDEGRAM_ENV_PATH` | — | Explicit path to `.env` (if starting from another directory) |
 | `CLAUDE_EXECUTABLE_PATH` | `claude` | Path to Claude Code CLI |
 | `BOT_NAME` | `Claudegram` | Bot personality name in system prompt |
 | `WORKSPACE_DIR` | `$HOME` | Root directory for project picker |

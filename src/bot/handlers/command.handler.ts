@@ -25,7 +25,8 @@ import { getTTSSettings, setTTSEnabled, setTTSVoice } from '../../tts/tts-settin
 import { maybeSendVoiceReply } from '../../tts/voice-reply.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import { execFile } from 'child_process';
+import { fileURLToPath } from 'url';
+import { execFile, spawn } from 'child_process';
 
 // Helper for consistent MarkdownV2 replies
 async function replyMd(ctx: Context, text: string): Promise<void> {
@@ -42,6 +43,31 @@ const TTS_VOICES = [
   'echo', 'fable', 'nova', 'onyx',
   'sage', 'shimmer', 'verse', 'marin', 'cedar',
 ] as const;
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(__dirname, '../../..');
+const BOTCTL_PATH = path.join(PROJECT_ROOT, 'scripts', 'claudegram-botctl.sh');
+
+function botctlExists(): boolean {
+  return fs.existsSync(BOTCTL_PATH);
+}
+
+function runBotCtl(args: string[]): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      BOTCTL_PATH,
+      args,
+      { cwd: PROJECT_ROOT },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error((stderr || error.message).trim()));
+          return;
+        }
+        resolve({ stdout: stdout || '', stderr: stderr || '' });
+      }
+    );
+  });
+}
 
 type TTSMenuMode = 'main' | 'voices';
 
@@ -440,7 +466,12 @@ export async function handleTTSCallback(ctx: Context): Promise<void> {
   if (!data || !data.startsWith('tts:')) return;
 
   if (data === 'tts:on') {
-    setTTSEnabled(chatId, true);
+    if (!config.OPENAI_API_KEY) {
+      await ctx.answerCallbackQuery({ text: 'OPENAI_API_KEY missing. Set it in .env and restart.' });
+      setTTSEnabled(chatId, false);
+    } else {
+      setTTSEnabled(chatId, true);
+    }
   } else if (data === 'tts:off') {
     setTTSEnabled(chatId, false);
   } else if (data.startsWith('tts:voice:')) {
@@ -465,6 +496,45 @@ export async function handleTTSCallback(ctx: Context): Promise<void> {
 export async function handlePing(ctx: Context): Promise<void> {
   const uptime = getUptimeFormatted();
   await replyMd(ctx, `🏓 Pong\\!\n\nUptime: ${esc(uptime)}`);
+}
+
+export async function handleBotStatus(ctx: Context): Promise<void> {
+  if (!botctlExists()) {
+    await replyMd(ctx, '❌ Bot control script not found\\.\n\nExpected at `scripts/claudegram-botctl.sh`\\.');
+    return;
+  }
+
+  try {
+    const { stdout, stderr } = await runBotCtl(['status']);
+    const output = (stdout || stderr || 'No output').trim();
+    await ctx.reply(`Bot status:\\n${output}`, { parse_mode: undefined });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    await ctx.reply(`Bot status error:\\n${errorMessage}`, { parse_mode: undefined });
+  }
+}
+
+export async function handleRestartBot(ctx: Context): Promise<void> {
+  if (!botctlExists()) {
+    await replyMd(ctx, '❌ Bot control script not found\\.\n\nExpected at `scripts/claudegram-botctl.sh`\\.');
+    return;
+  }
+
+  await replyMd(
+    ctx,
+    '🔁 Restarting bot\\.\n\nAfter it comes back, use `/continue` or `/resume` to restore your session\\.'
+  );
+
+  try {
+    const child = spawn(
+      BOTCTL_PATH,
+      ['recover'],
+      { cwd: PROJECT_ROOT, detached: true, stdio: 'ignore' }
+    );
+    child.unref();
+  } catch (error) {
+    console.error('[BotCtl] Failed to restart:', error);
+  }
 }
 
 export async function handleCancel(ctx: Context): Promise<void> {
@@ -560,7 +630,7 @@ export async function handlePlan(ctx: Context): Promise<void> {
 
   const session = sessionManager.getSession(chatId);
   if (!session) {
-    await replyMd(ctx, '⚠️ No project set\\.\n\nUse `/project` to open a project first\\.');
+    await replyMd(ctx, '⚠️ No project set\\.\n\nIf the bot restarted, use `/continue` or `/resume` to restore your last session\\.\nOr use `/project` to open a project first\\.');
     return;
   }
 
@@ -618,7 +688,7 @@ export async function handleExplore(ctx: Context): Promise<void> {
 
   const session = sessionManager.getSession(chatId);
   if (!session) {
-    await replyMd(ctx, '⚠️ No project set\\.\n\nUse `/project` to open a project first\\.');
+    await replyMd(ctx, '⚠️ No project set\\.\n\nIf the bot restarted, use `/continue` or `/resume` to restore your last session\\.\nOr use `/project` to open a project first\\.');
     return;
   }
 
@@ -751,7 +821,7 @@ export async function handleLoop(ctx: Context): Promise<void> {
 
   const session = sessionManager.getSession(chatId);
   if (!session) {
-    await replyMd(ctx, '⚠️ No project set\\.\n\nUse `/project` to open a project first\\.');
+    await replyMd(ctx, '⚠️ No project set\\.\n\nIf the bot restarted, use `/continue` or `/resume` to restore your last session\\.\nOr use `/project` to open a project first\\.');
     return;
   }
 
@@ -858,7 +928,7 @@ export async function handleFile(ctx: Context): Promise<void> {
 
   const session = sessionManager.getSession(chatId);
   if (!session) {
-    await replyMd(ctx, '⚠️ No project set\\. Use `/project <path>` first\\.');
+    await replyMd(ctx, '⚠️ No project set\\.\n\nIf the bot restarted, use `/continue` or `/resume` to restore your last session\\.\nOr use `/project <path>` to open a project first\\.');
     return;
   }
 
@@ -913,7 +983,7 @@ export async function handleTelegraph(ctx: Context): Promise<void> {
 
   const session = sessionManager.getSession(chatId);
   if (!session) {
-    await replyMd(ctx, '⚠️ No project set\\. Use `/project <path>` first\\.');
+    await replyMd(ctx, '⚠️ No project set\\.\n\nIf the bot restarted, use `/continue` or `/resume` to restore your last session\\.\nOr use `/project <path>` to open a project first\\.');
     return;
   }
 

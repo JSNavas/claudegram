@@ -101,7 +101,7 @@ export async function handleMessage(ctx: Context): Promise<void> {
   const session = sessionManager.getSession(chatId);
   if (!session) {
     await ctx.reply(
-      '⚠️ No project set\\.\n\nUse `/project` to open a project first\\.',
+      '⚠️ No project set\\.\n\nIf the bot restarted, use `/continue` or `/resume` to restore your last session\\.\nOr use `/project` to open a project first\\.',
       { parse_mode: 'MarkdownV2' }
     );
     return;
@@ -180,7 +180,7 @@ async function handleFileReply(ctx: Context, chatId: number, filePath: string): 
   const session = sessionManager.getSession(chatId);
   if (!session) {
     await ctx.reply(
-      '⚠️ No project set\\. Use `/project` first\\.',
+      '⚠️ No project set\\.\n\nIf the bot restarted, use `/continue` or `/resume` to restore your last session\\.\nOr use `/project` to open a project first\\.',
       { parse_mode: 'MarkdownV2' }
     );
     return;
@@ -226,7 +226,7 @@ async function handleAgentReply(
   const session = sessionManager.getSession(chatId);
   if (!session) {
     await ctx.reply(
-      '⚠️ No project set\\. Use `/project` first\\.',
+      '⚠️ No project set\\.\n\nIf the bot restarted, use `/continue` or `/resume` to restore your last session\\.\nOr use `/project` to open a project first\\.',
       { parse_mode: 'MarkdownV2' }
     );
     return;
@@ -288,7 +288,7 @@ async function handleTelegraphReply(ctx: Context, chatId: number, filePath: stri
   const session = sessionManager.getSession(chatId);
   if (!session) {
     await ctx.reply(
-      '⚠️ No project set\\. Use `/project` first\\.',
+      '⚠️ No project set\\.\n\nIf the bot restarted, use `/continue` or `/resume` to restore your last session\\.\nOr use `/project` to open a project first\\.',
       { parse_mode: 'MarkdownV2' }
     );
     return;
