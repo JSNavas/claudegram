@@ -446,7 +446,7 @@ export async function executeVReddit(ctx: Context, input: string): Promise<void>
     if (finalSize > maxVideoBytes) {
       // Save the original uncompressed video to the workspace directory
       const timestamp = Date.now();
-      const savedDir = path.join(config.WORKSPACE_DIR, 'vreddit-originals');
+      const savedDir = path.join(os.homedir(), 'Workspace', 'vreddit-originals');
       try {
         fs.mkdirSync(savedDir, { recursive: true });
         const savedPath = path.join(savedDir, `vreddit-${timestamp}.mp4`);
