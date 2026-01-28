@@ -1,74 +1,51 @@
 import { execFile } from 'child_process';
+import * as fs from 'fs';
 import * as path from 'path';
 import { config } from '../config.js';
 
+const GROQ_WHISPER_ENDPOINT = 'https://api.groq.com/openai/v1/audio/transcriptions';
+const GROQ_WHISPER_MODEL = 'whisper-large-v3-turbo';
+
 /**
- * Extract the transcript text from groq_transcribe.py stdout.
- * The script prints "Full text:\n<text>" as the last output.
+ * Transcribe an audio file using the Groq Whisper API directly via fetch.
+ * No Python subprocess — much faster, especially on first call.
  */
-export function parseTranscript(stdout: string): string {
-  const marker = 'Full text:\n';
-  const idx = stdout.lastIndexOf(marker);
-  if (idx !== -1) {
-    return stdout.slice(idx + marker.length).trim();
+export async function transcribeFile(filePath: string): Promise<string> {
+  if (!config.GROQ_API_KEY) {
+    throw new Error('GROQ_API_KEY not configured. Set it in .env to enable voice transcription.');
   }
-  // Fallback: return the last non-empty line
-  const lines = stdout.trim().split('\n').filter((l) => l.trim());
-  return lines[lines.length - 1] || '';
-}
 
-/**
- * Transcribe an audio file using groq_transcribe.py.
- * Returns the transcript text.
- */
-export function transcribeFile(filePath: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const args = [
-      config.GROQ_TRANSCRIBE_PATH,
-      filePath,
-      '--task', 'transcribe',
-      '--language', config.VOICE_LANGUAGE,
-    ];
+  const fileBuffer = fs.readFileSync(filePath);
+  const fileName = path.basename(filePath);
 
-    const env = { ...process.env };
-    if (config.GROQ_API_KEY) {
-      env.GROQ_API_KEY = config.GROQ_API_KEY;
-    }
+  const formData = new FormData();
+  formData.append('file', new Blob([fileBuffer]), fileName);
+  formData.append('model', GROQ_WHISPER_MODEL);
+  formData.append('language', config.VOICE_LANGUAGE);
+  formData.append('response_format', 'json');
 
-    execFile(
-      'python3',
-      args,
-      {
-        timeout: config.VOICE_TIMEOUT_MS,
-        maxBuffer: 10 * 1024 * 1024,
-        cwd: path.dirname(config.GROQ_TRANSCRIBE_PATH),
-        env,
-      },
-      (error, stdout, stderr) => {
-        if (error) {
-          const stderrText = (stderr || '').trim();
-          if (stderrText.includes('GROQ_API_KEY')) {
-            reject(new Error('GROQ_API_KEY not configured. Set it in .env to enable voice transcription.'));
-          } else if (stderrText.includes('ModuleNotFoundError')) {
-            const modMatch = stderrText.match(/No module named '(\w+)'/);
-            reject(new Error(`Missing Python dependency: ${modMatch ? modMatch[1] : 'unknown'}`));
-          } else if ((error as { killed?: boolean }).killed) {
-            reject(new Error('Transcription timed out.'));
-          } else {
-            reject(new Error(stderrText || error.message));
-          }
-          return;
-        }
-
-        const transcript = parseTranscript(stdout || '');
-        if (!transcript) {
-          reject(new Error('Empty transcription result'));
-          return;
-        }
-        resolve(transcript);
-      }
-    );
+  const response = await fetch(GROQ_WHISPER_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${config.GROQ_API_KEY}`,
+    },
+    body: formData,
+    signal: AbortSignal.timeout(config.VOICE_TIMEOUT_MS),
   });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`Groq Whisper API error ${response.status}: ${body.slice(0, 300)}`);
+  }
+
+  const result = await response.json() as { text?: string };
+  const transcript = (result.text || '').trim();
+
+  if (!transcript) {
+    throw new Error('Empty transcription result');
+  }
+
+  return transcript;
 }
 
 /**

@@ -136,7 +136,7 @@ export async function handleVoice(ctx: Context): Promise<void> {
         } catch { /* ignore */ }
       }
 
-      await messageSender.sendMessage(ctx, `🎤 Transcript:\n\n${transcript}`);
+      await messageSender.sendMessage(ctx, `👤 ${transcript}`);
     } else {
       // Remove ack message
       try {
