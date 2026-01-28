@@ -306,7 +306,7 @@ src/
 │   ├── telegraph.ts               # Telegraph Instant View client
 │   └── deduplication.ts           # Message dedup
 ├── tts/
-│   ├── openai-tts.ts              # OpenAI TTS API client
+│   ├── tts.ts                     # TTS provider routing (Groq / OpenAI)
 │   ├── tts-settings.ts            # Per-chat voice settings
 │   └── voice-reply.ts             # TTS hook for agent responses
 ├── audio/

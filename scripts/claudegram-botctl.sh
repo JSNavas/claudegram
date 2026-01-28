@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Ensure NVM/node is on PATH when launched non-interactively (nohup, cron, etc.)
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_FILE="${ROOT_DIR}/claudegram.dev.log"
 
@@ -146,6 +150,9 @@ function stop_all() {
   if ! wait_for_stop_all 10; then
     echo "Warning: Claudegram processes did not fully stop within timeout."
   fi
+
+  # Give OS time to release file descriptors after process death
+  sleep 1
 }
 
 function start() {
@@ -157,10 +164,12 @@ function start() {
 
   echo "Starting Claudegram (${MODE})..."
   cd "${ROOT_DIR}"
+  # Truncate log so nohup opens a clean file descriptor
+  : > "${LOG_FILE}"
   if [[ "${MODE}" == "prod" ]]; then
-    nohup npm start > "${LOG_FILE}" 2>&1 &
+    nohup npm start >> "${LOG_FILE}" 2>&1 &
   else
-    nohup npm run dev > "${LOG_FILE}" 2>&1 &
+    nohup npm run dev >> "${LOG_FILE}" 2>&1 &
   fi
 
   if ! wait_for_start 10; then

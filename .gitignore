@@ -5,3 +5,6 @@ dist/
 .DS_Store
 .telegraph-account.json
 .claudegram/
+__pycache__/
+storage_state.json
+output/
