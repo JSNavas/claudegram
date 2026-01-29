@@ -28,12 +28,15 @@ import {
   handleContinue,
   handleLoop,
   handleSessions,
+  handleTeleport,
   handleFile,
   handleTelegraph,
   handleReddit,
   handleVReddit,
   handleMedium,
   handleMediumCallback,
+  handleTerminalUI,
+  handleTerminalUICallback,
   handleTranscribe,
   handleTranscribeAudio,
   handleTranscribeDocument,
@@ -58,6 +61,7 @@ export async function createBot(): Promise<Bot> {
     { command: 'telegraph', description: '📄 View markdown with Instant View' },
     { command: 'model', description: '🤖 Switch AI model' },
     { command: 'mode', description: '⚙️ Toggle streaming mode' },
+    { command: 'terminalui', description: '🖥️ Toggle terminal-style display' },
     { command: 'tts', description: '🔊 Toggle voice replies' },
     { command: 'botstatus', description: '🩺 Show bot process status' },
     { command: 'restartbot', description: '🔁 Restart the bot' },
@@ -66,6 +70,7 @@ export async function createBot(): Promise<Bot> {
     { command: 'explore', description: '🔍 Explore codebase' },
     { command: 'loop', description: '🔄 Run in loop mode' },
     { command: 'sessions', description: '📚 View saved sessions' },
+    { command: 'teleport', description: '🚀 Move session to terminal' },
     { command: 'resume', description: '▶️ Resume a session' },
     { command: 'reddit', description: '📡 Fetch Reddit posts & subreddits' },
     { command: 'vreddit', description: '🎬 Download Reddit video from post URL' },
@@ -89,6 +94,7 @@ export async function createBot(): Promise<Bot> {
   bot.command('newproject', handleNewProject);
   bot.command('status', handleStatus);
   bot.command('mode', handleMode);
+  bot.command('terminalui', handleTerminalUI);
   bot.command('tts', handleTTS);
   bot.command('botstatus', handleBotStatus);
   bot.command('restartbot', handleRestartBot);
@@ -109,6 +115,9 @@ export async function createBot(): Promise<Bot> {
 
   // Loop mode
   bot.command('loop', handleLoop);
+
+  // Teleport to terminal
+  bot.command('teleport', handleTeleport);
 
   // File commands
   bot.command('file', handleFile);
@@ -135,6 +144,8 @@ export async function createBot(): Promise<Bot> {
       await handleModelCallback(ctx);
     } else if (data.startsWith('mode:')) {
       await handleModeCallback(ctx);
+    } else if (data.startsWith('terminalui:')) {
+      await handleTerminalUICallback(ctx);
     } else if (data.startsWith('tts:')) {
       await handleTTSCallback(ctx);
     } else if (data.startsWith('clear:')) {

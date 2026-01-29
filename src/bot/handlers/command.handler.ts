@@ -24,6 +24,7 @@ import { createTelegraphFromFile, createTelegraphPage } from '../../telegram/tel
 import { isMediumUrl, fetchMediumArticle, FreediumArticle } from '../../medium/freedium.js';
 import { escapeMarkdownV2 as esc } from '../../telegram/markdown.js';
 import { getTTSSettings, setTTSEnabled, setTTSVoice, setTTSAutoplay } from '../../tts/tts-settings.js';
+import { getTerminalUISettings, setTerminalUIEnabled } from '../../telegram/terminal-settings.js';
 import { maybeSendVoiceReply } from '../../tts/voice-reply.js';
 import { transcribeFile, downloadTelegramAudio } from '../../audio/transcribe.js';
 import { executeVReddit } from '../../reddit/vreddit.js';
@@ -808,6 +809,61 @@ export async function handleModeCallback(ctx: Context): Promise<void> {
   );
 }
 
+export async function handleTerminalUI(ctx: Context): Promise<void> {
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+
+  const settings = getTerminalUISettings(chatId);
+  const currentStatus = settings.enabled ? 'ON' : 'OFF';
+
+  const keyboard = [
+    [
+      {
+        text: settings.enabled ? '✓ On' : 'On',
+        callback_data: 'terminalui:on'
+      },
+      {
+        text: !settings.enabled ? '✓ Off' : 'Off',
+        callback_data: 'terminalui:off'
+      },
+    ],
+  ];
+
+  const description = settings.enabled
+    ? '_Shows spinner animations and tool status during operations_'
+    : '_Classic streaming mode with simple cursor_';
+
+  await ctx.reply(
+    `🖥️ *Terminal UI Mode*\n\nCurrent: *${currentStatus}*\n${description}`,
+    {
+      parse_mode: 'MarkdownV2',
+      reply_markup: { inline_keyboard: keyboard },
+    }
+  );
+}
+
+export async function handleTerminalUICallback(ctx: Context): Promise<void> {
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+
+  const data = ctx.callbackQuery?.data;
+  if (!data || !data.startsWith('terminalui:')) return;
+
+  const newState = data.replace('terminalui:', '') === 'on';
+  setTerminalUIEnabled(chatId, newState);
+
+  const statusText = newState ? 'ON' : 'OFF';
+  const description = newState
+    ? '_Shows spinner animations and tool status during operations_'
+    : '_Classic streaming mode with simple cursor_';
+
+  await ctx.answerCallbackQuery({ text: `Terminal UI ${statusText}!` });
+  await ctx.editMessageText(
+    `✅ Terminal UI *${statusText}*\n\n${description}`,
+    { parse_mode: 'MarkdownV2' }
+  );
+}
+
 export async function handleTTS(ctx: Context): Promise<void> {
   const chatId = ctx.chat?.id;
   if (!chatId) return;
@@ -1343,6 +1399,41 @@ export async function handleSessions(ctx: Context): Promise<void> {
   }
 
   message += '\n_Use `/resume` to switch sessions or `/continue` to resume the last one\\._';
+
+  await replyMd(ctx, message);
+}
+
+export async function handleTeleport(ctx: Context): Promise<void> {
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+
+  const session = sessionManager.getSession(chatId);
+
+  if (!session) {
+    await replyMd(ctx, 'ℹ️ No active session to teleport\\.\n\nStart a conversation first with `/project <name>`\\.');
+    return;
+  }
+
+  if (!session.claudeSessionId) {
+    await replyMd(ctx, 'ℹ️ No Claude session available yet\\.\n\nSend a message first to start a session, then use `/teleport`\\.');
+    return;
+  }
+
+  const projectName = path.basename(session.workingDirectory);
+  const command = `cd "${session.workingDirectory}" && claude --resume ${session.claudeSessionId}`;
+
+  const message = `🚀 *Teleport to Terminal*
+
+*Project:* \`${esc(projectName)}\`
+*Session:* \`${esc(session.claudeSessionId.substring(0, 8))}\\.\\.\\.\`
+
+Copy and run in your terminal:
+
+\`\`\`
+${esc(command)}
+\`\`\`
+
+_Both Telegram and terminal can continue independently \\(forked session\\)\\._`;
 
   await replyMd(ctx, message);
 }
