@@ -26,6 +26,16 @@ import { getTTSSettings, setTTSEnabled, setTTSVoice, setTTSAutoplay } from '../.
 import { maybeSendVoiceReply } from '../../tts/voice-reply.js';
 import { transcribeFile, downloadTelegramAudio } from '../../audio/transcribe.js';
 import { executeVReddit } from '../../reddit/vreddit.js';
+import {
+  detectPlatform,
+  platformLabel,
+  isValidUrl,
+  extractMedia,
+  cleanupExtractResult,
+  type ExtractMode,
+  type ExtractResult,
+  type SubtitleFormat,
+} from '../../media/extract.js';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -1987,4 +1997,312 @@ export async function handleTranscribeDocument(ctx: Context): Promise<void> {
   if (!doc || !doc.mime_type?.startsWith('audio/')) return;
 
   await transcribeAndSend(ctx, doc.file_id, doc.mime_type);
+}
+
+// ── /extract command ───────────────────────────────────────────────
+
+// Store pending extract URLs keyed by chatId so the callback knows what to process
+const pendingExtractUrls = new Map<number, string>();
+
+export async function handleExtract(ctx: Context): Promise<void> {
+  const text = ctx.message?.text || '';
+  const args = text.split(' ').slice(1).join(' ').trim();
+
+  if (!args) {
+    await ctx.reply(
+      `\u{1F4E5} *Extract Media*\n\n` +
+      `Extract text, audio, or video from a URL\\.\n\n` +
+      `*Supported platforms:*\n` +
+      `\u{25B6}\u{FE0F} YouTube\n` +
+      `\u{1F4F7} Instagram\n` +
+      `\u{1F3B5} TikTok\n\n` +
+      `\u{1F447} _Paste a URL:_`,
+      {
+        parse_mode: 'MarkdownV2',
+        reply_markup: {
+          force_reply: true,
+          input_field_placeholder: 'https://youtube.com/watch?v=...',
+          selective: true,
+        },
+      }
+    );
+    return;
+  }
+
+  await showExtractMenu(ctx, args);
+}
+
+export async function showExtractMenu(ctx: Context, url: string): Promise<void> {
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+
+  if (!isValidUrl(url)) {
+    await ctx.reply('\u{274C} Invalid URL\\. Please provide a valid link\\.', { parse_mode: 'MarkdownV2' });
+    return;
+  }
+
+  const platform = detectPlatform(url);
+  if (platform === 'unknown') {
+    await ctx.reply(
+      '\u{26A0}\u{FE0F} Unsupported platform\\. Supported: YouTube, Instagram, TikTok\\.',
+      { parse_mode: 'MarkdownV2' }
+    );
+    return;
+  }
+
+  const label = platformLabel(platform);
+
+  // Store URL for callback
+  pendingExtractUrls.set(chatId, url);
+
+  await ctx.reply(
+    `\u{1F4E5} *Extract from ${esc(label)}*\n\n` +
+    `\`${esc(url.length > 60 ? url.slice(0, 57) + '...' : url)}\`\n\n` +
+    `What do you want?`,
+    {
+      parse_mode: 'MarkdownV2',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '\u{1F4DD} Text', callback_data: 'extract:text' },
+            { text: '\u{1F3A7} Audio', callback_data: 'extract:audio' },
+          ],
+          [
+            { text: '\u{1F3AC} Video', callback_data: 'extract:video' },
+            { text: '\u{2728} All', callback_data: 'extract:all' },
+          ],
+        ],
+      },
+    }
+  );
+}
+
+export async function handleExtractCallback(ctx: Context): Promise<void> {
+  const data = ctx.callbackQuery?.data;
+  const chatId = ctx.chat?.id;
+  if (!data || !chatId) return;
+
+  // Handle subtitle format selection (extract:subfmt:<format>)
+  if (data.startsWith('extract:subfmt:')) {
+    const subtitleFormat = data.replace('extract:subfmt:', '') as SubtitleFormat;
+    if (!['text', 'srt', 'vtt'].includes(subtitleFormat)) return;
+
+    await ctx.answerCallbackQuery();
+
+    const url = pendingExtractUrls.get(chatId);
+    if (!url) {
+      await ctx.reply('\u{26A0}\u{FE0F} Session expired\\. Please send the URL again with `/extract`\\.', {
+        parse_mode: 'MarkdownV2',
+      });
+      return;
+    }
+    pendingExtractUrls.delete(chatId);
+
+    // Remove the subtitle format menu
+    try {
+      const menuMsgId = ctx.callbackQuery?.message?.message_id;
+      if (menuMsgId) await ctx.api.deleteMessage(chatId, menuMsgId);
+    } catch { /* ignore */ }
+
+    await executeExtract(ctx, url, 'text', subtitleFormat);
+    return;
+  }
+
+  const mode = data.replace('extract:', '') as ExtractMode;
+  if (!['text', 'audio', 'video', 'all'].includes(mode)) return;
+
+  await ctx.answerCallbackQuery();
+
+  const url = pendingExtractUrls.get(chatId);
+  if (!url) {
+    await ctx.reply('\u{26A0}\u{FE0F} Session expired\\. Please send the URL again with `/extract`\\.', {
+      parse_mode: 'MarkdownV2',
+    });
+    return;
+  }
+
+  // YouTube + Text → show subtitle format submenu (keep URL pending)
+  const platform = detectPlatform(url);
+  if (mode === 'text' && platform === 'youtube') {
+    try {
+      await ctx.editMessageText(
+        `\u{1F4DD} *Subtitle Format*\n\n` +
+        `How would you like the transcript?`,
+        {
+          parse_mode: 'MarkdownV2',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '\u{1F4DD} Plain Text', callback_data: 'extract:subfmt:text' },
+              ],
+              [
+                { text: '\u{1F4CB} SRT', callback_data: 'extract:subfmt:srt' },
+                { text: '\u{1F4C4} VTT', callback_data: 'extract:subfmt:vtt' },
+              ],
+            ],
+          },
+        }
+      );
+    } catch {
+      // If edit fails, send new message
+      await ctx.reply(
+        `\u{1F4DD} *Subtitle Format*\n\nHow would you like the transcript?`,
+        {
+          parse_mode: 'MarkdownV2',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '\u{1F4DD} Plain Text', callback_data: 'extract:subfmt:text' },
+              ],
+              [
+                { text: '\u{1F4CB} SRT', callback_data: 'extract:subfmt:srt' },
+                { text: '\u{1F4C4} VTT', callback_data: 'extract:subfmt:vtt' },
+              ],
+            ],
+          },
+        }
+      );
+    }
+    return;
+  }
+
+  pendingExtractUrls.delete(chatId);
+
+  // Remove the menu message
+  try {
+    const menuMsgId = ctx.callbackQuery?.message?.message_id;
+    if (menuMsgId) {
+      await ctx.api.deleteMessage(chatId, menuMsgId);
+    }
+  } catch { /* ignore */ }
+
+  await executeExtract(ctx, url, mode);
+}
+
+export async function executeExtract(ctx: Context, url: string, mode: ExtractMode, subtitleFormat?: SubtitleFormat): Promise<void> {
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+
+  const ackMsg = await ctx.reply('\u{1F4E5} Processing...', { parse_mode: undefined });
+
+  const updateAck = async (text: string) => {
+    try {
+      await ctx.api.editMessageText(chatId, ackMsg.message_id, text, { parse_mode: undefined });
+    } catch { /* ignore */ }
+  };
+
+  let result: ExtractResult | null = null;
+
+  try {
+    result = await extractMedia({
+      url,
+      mode,
+      subtitleFormat,
+      onProgress: (msg) => updateAck(msg),
+    });
+
+    // Delete ack message
+    try { await ctx.api.deleteMessage(chatId, ackMsg.message_id); } catch { /* ignore */ }
+
+    // Send results
+    const platform = platformLabel(result.platform);
+    const title = result.title || 'Untitled';
+    const durationStr = result.duration
+      ? ` (${Math.floor(result.duration / 60)}:${String(Math.floor(result.duration % 60)).padStart(2, '0')})`
+      : '';
+
+    // Header
+    const header = `\u{1F4E5} *${esc(platform)}*: ${esc(title)}${esc(durationStr)}`;
+
+    // Send video if available
+    if (result.videoPath && fs.existsSync(result.videoPath)) {
+      try {
+        await ctx.replyWithChatAction('upload_video');
+        await ctx.replyWithVideo(new InputFile(result.videoPath), {
+          caption: `\u{1F3AC} ${title}${durationStr}`,
+          supports_streaming: true,
+        });
+      } catch (videoSendErr) {
+        console.warn('[extract] Failed to send video:', videoSendErr);
+        await ctx.reply('\u{26A0}\u{FE0F} Video file could not be sent (may be too large).', { parse_mode: undefined });
+      }
+    }
+
+    // Send audio if requested (and not already handled by video)
+    if (result.audioPath && fs.existsSync(result.audioPath) && (mode === 'audio' || mode === 'all')) {
+      try {
+        await ctx.replyWithChatAction('upload_voice');
+        await ctx.replyWithAudio(new InputFile(result.audioPath), {
+          title: title,
+          caption: `\u{1F3A7} ${title}${durationStr}`,
+        });
+      } catch (audioSendErr) {
+        console.warn('[extract] Failed to send audio:', audioSendErr);
+        await ctx.reply('\u{26A0}\u{FE0F} Audio file could not be sent.', { parse_mode: undefined });
+      }
+    }
+
+    // Send subtitle file (SRT/VTT) if available
+    if (result.subtitlePath && result.subtitleFormat && fs.existsSync(result.subtitlePath)) {
+      const ext = result.subtitleFormat; // 'srt' or 'vtt'
+      const safeTitle = title.replace(/[^a-zA-Z0-9]/g, '_');
+      const fileName = `${safeTitle}.${ext}`;
+      try {
+        const inputFile = new InputFile(fs.readFileSync(result.subtitlePath), fileName);
+        await ctx.replyWithDocument(inputFile, {
+          caption: `\u{1F4DD} ${ext.toUpperCase()} subtitles for: ${title}${durationStr}`,
+        });
+      } catch (subSendErr) {
+        console.warn('[extract] Failed to send subtitle file:', subSendErr);
+        await ctx.reply('\u{26A0}\u{FE0F} Subtitle file could not be sent.', { parse_mode: undefined });
+      }
+    }
+
+    // Send transcript (plain text from Whisper or YouTube VTT→text)
+    if (result.transcript) {
+      if (result.transcript.length <= config.TRANSCRIBE_FILE_THRESHOLD_CHARS) {
+        await ctx.reply(`${header}\n\n${esc(result.transcript)}`, {
+          parse_mode: 'MarkdownV2',
+        });
+      } else {
+        // Send as .txt file
+        const tmpPath = path.join(os.tmpdir(), `extract_transcript_${Date.now()}.txt`);
+        try {
+          fs.writeFileSync(tmpPath, result.transcript, 'utf-8');
+          const inputFile = new InputFile(fs.readFileSync(tmpPath), `${title.replace(/[^a-zA-Z0-9]/g, '_')}_transcript.txt`);
+          await ctx.replyWithDocument(inputFile, {
+            caption: `\u{1F4DD} Transcript (${result.transcript.length} chars)`,
+          });
+        } finally {
+          try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+        }
+      }
+    } else if ((mode === 'text' || mode === 'all') && !result.subtitlePath) {
+      // Transcript was expected but empty and no subtitle file was sent either
+      await ctx.reply('\u{26A0}\u{FE0F} No speech detected in the audio.', { parse_mode: undefined });
+    }
+
+    // Show any warnings
+    for (const warning of result.warnings) {
+      await ctx.reply(`\u{26A0}\u{FE0F} ${warning}`, { parse_mode: undefined });
+    }
+
+    // Success summary for non-text modes when no transcript was sent
+    if (mode !== 'text' && !result.transcript) {
+      await ctx.reply(header, { parse_mode: 'MarkdownV2' });
+    }
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[extract] Error:', error);
+    try {
+      await ctx.api.editMessageText(chatId, ackMsg.message_id, `\u{274C} ${errorMessage}`, { parse_mode: undefined });
+    } catch {
+      await ctx.reply(`\u{274C} Extraction failed: ${esc(errorMessage)}`, { parse_mode: 'MarkdownV2' });
+    }
+  } finally {
+    if (result) {
+      cleanupExtractResult(result);
+    }
+  }
 }

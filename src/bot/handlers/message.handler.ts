@@ -13,7 +13,7 @@ import {
 import { isClaudeCommand } from '../../claude/command-parser.js';
 import { escapeMarkdownV2 } from '../../telegram/markdown.js';
 import { createTelegraphFromFile } from '../../telegram/telegraph.js';
-import { getStreamingMode, executeRedditFetch, executeMediumFetch } from './command.handler.js';
+import { getStreamingMode, executeRedditFetch, executeMediumFetch, showExtractMenu } from './command.handler.js';
 import { executeVReddit } from '../../reddit/vreddit.js';
 import { maybeSendVoiceReply } from '../../tts/voice-reply.js';
 import * as fs from 'fs';
@@ -131,6 +131,12 @@ export async function handleMessage(ctx: Context): Promise<void> {
     // Handle medium fetch reply
     if (replyText.includes('Medium Fetch') || replyText.includes('Medium article')) {
       await executeMediumFetch(ctx, text.trim());
+      return;
+    }
+
+    // Handle extract media reply
+    if (replyText.includes('Extract Media') || replyText.includes('Paste a URL')) {
+      await showExtractMenu(ctx, text.trim());
       return;
     }
   }
