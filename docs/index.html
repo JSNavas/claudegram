@@ -844,9 +844,14 @@
       .command-row { grid-template-columns: 1fr; gap: 0.5rem; }
       .command-code { font-size: 0.85rem; }
       .code-block { margin: 0; }
-      .code-content pre { font-size: 0.8rem; }
+      .code-content pre { font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; }
       .telegram-phone { max-width: 100%; margin: 0 1rem; }
       .container { padding: 0 1rem; }
+      .prereq-badge { white-space: normal; text-align: center; padding: 0.625rem 1rem; }
+      .step-item { flex-direction: column; text-align: center; }
+      .step-number { margin-bottom: 0.5rem; }
+      .step-content h4, .step-content p { word-wrap: break-word; }
+      .prereq-note { font-size: 0.85rem; }
     }
 
     @media (max-width: 480px) {
@@ -854,8 +859,6 @@
       .feature-tabs { flex-direction: column; align-items: stretch; }
       .feature-tab { text-align: center; }
       .flow-node-label { font-size: 0.75rem; }
-      .step-item { flex-direction: column; text-align: center; }
-      .step-number { margin-bottom: 0.5rem; }
     }
 
     /* Scrollbar */
