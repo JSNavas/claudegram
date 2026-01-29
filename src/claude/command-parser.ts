@@ -72,8 +72,9 @@ export function getAvailableCommands(): string {
 
 • \`/medium <url>\` \\- Fetch Medium article with images
 
-*Audio Commands:*
+*Media Commands:*
 
+• \`/extract <url>\` \\- Extract text/audio/video from YouTube, Instagram, TikTok
 • \`/transcribe\` \\- Transcribe audio to text \\(reply to voice/audio, or ForceReply\\)
 
 *Bot Commands:*

@@ -37,6 +37,8 @@ import {
   handleTranscribe,
   handleTranscribeAudio,
   handleTranscribeDocument,
+  handleExtract,
+  handleExtractCallback,
 } from './handlers/command.handler.js';
 import { handleMessage } from './handlers/message.handler.js';
 import { handleVoice } from './handlers/voice.handler.js';
@@ -69,6 +71,7 @@ export async function createBot(): Promise<Bot> {
     { command: 'vreddit', description: '🎬 Download Reddit video from post URL' },
     { command: 'medium', description: '📰 Fetch Medium articles' },
     { command: 'transcribe', description: '🎤 Transcribe audio to text' },
+    { command: 'extract', description: '📥 Extract text/audio/video from URL' },
     { command: 'commands', description: '📜 List all commands' },
   ]).then(() => {
     console.log('📋 Command menu registered');
@@ -119,6 +122,9 @@ export async function createBot(): Promise<Bot> {
   // Transcribe
   bot.command('transcribe', handleTranscribe);
 
+  // Media extraction
+  bot.command('extract', handleExtract);
+
   // Callback query handler for inline keyboards
   bot.on('callback_query:data', async (ctx) => {
     const data = ctx.callbackQuery.data;
@@ -137,6 +143,8 @@ export async function createBot(): Promise<Bot> {
       await handleProjectCallback(ctx);
     } else if (data.startsWith('medium:')) {
       await handleMediumCallback(ctx);
+    } else if (data.startsWith('extract:')) {
+      await handleExtractCallback(ctx);
     }
   });
 

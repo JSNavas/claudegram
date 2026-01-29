@@ -128,6 +128,13 @@ const envSchema = z.object({
     .string()
     .default('4000')
     .transform((val) => parseInt(val, 10)),
+  // Media extraction (/extract command)
+  YTDLP_COOKIES_PATH: z.string().default(''),
+  YTDLP_PROXY_LIST_PATH: z.string().default(''),
+  EXTRACT_TRANSCRIBE_TIMEOUT_MS: z
+    .string()
+    .default('180000')
+    .transform((val) => parseInt(val, 10)),
 });
 
 const parsed = envSchema.safeParse(process.env);

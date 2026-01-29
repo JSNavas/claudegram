@@ -146,6 +146,18 @@ Medium Tool:
 The user can fetch Medium articles via the /medium Telegram command (uses Freedium).
 You do NOT need to fetch Medium articles yourself — the bot handles it directly.`;
 
+const EXTRACT_TOOL_PROMPT = `
+
+Media Extract Tool:
+The user can extract text transcripts, audio, or video from YouTube, Instagram, and TikTok URLs using the /extract Telegram command.
+Usage: /extract <url> — shows a menu to pick: Text, Audio, Video, or All.
+- Text: Downloads audio, transcribes via Groq Whisper, returns transcript
+- Audio: Downloads and sends the audio file (MP3)
+- Video: Downloads and sends the video file (MP4, if under 50MB)
+- All: Returns transcript + audio + video
+If the user asks you to transcribe a YouTube/Instagram/TikTok video, tell them to use /extract with the URL.
+For voice notes sent directly in chat, use /transcribe instead.`;
+
 const REASONING_SUMMARY_INSTRUCTIONS = `
 
 Reasoning Summary (required when enabled):
@@ -154,7 +166,7 @@ Reasoning Summary (required when enabled):
 - Do NOT reveal chain-of-thought, hidden reasoning, or sensitive tool outputs.
 - Skip the summary for very short acknowledgements or pure error messages.`;
 
-const SYSTEM_PROMPT = `${BASE_SYSTEM_PROMPT}${REDDIT_VIDEO_TOOL_PROMPT}${MEDIUM_TOOL_PROMPT}${config.CLAUDE_REASONING_SUMMARY ? REASONING_SUMMARY_INSTRUCTIONS : ''}`;
+const SYSTEM_PROMPT = `${BASE_SYSTEM_PROMPT}${REDDIT_VIDEO_TOOL_PROMPT}${MEDIUM_TOOL_PROMPT}${EXTRACT_TOOL_PROMPT}${config.CLAUDE_REASONING_SUMMARY ? REASONING_SUMMARY_INSTRUCTIONS : ''}`;
 
 /**
  * Strip the "Reasoning Summary" section from the end of a response
