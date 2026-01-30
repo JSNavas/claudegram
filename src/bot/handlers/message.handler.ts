@@ -12,7 +12,7 @@ import {
   setAbortController,
 } from '../../claude/request-queue.js';
 import { isClaudeCommand } from '../../claude/command-parser.js';
-import { escapeMarkdownV2 } from '../../telegram/markdown.js';
+import { escapeMarkdownV2 as esc } from '../../telegram/markdown.js';
 import { createTelegraphFromFile } from '../../telegram/telegraph.js';
 import { getStreamingMode, executeRedditFetch, executeMediumFetch, showExtractMenu, projectStatusSuffix, resumeCommandMessage } from './command.handler.js';
 import { executeVReddit } from '../../reddit/vreddit.js';
@@ -22,14 +22,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { getWorkspaceRoot, isPathWithinRoot } from '../../utils/workspace-guard.js';
 
-// Helper for MarkdownV2
-function esc(text: string): string {
-  return escapeMarkdownV2(text);
-}
-
 async function replyFeatureDisabled(ctx: Context, feature: string): Promise<void> {
   await ctx.reply(`⚠️ ${feature} feature is disabled in configuration.`, { parse_mode: undefined });
 }
+
 
 function extractRedditUrl(text: string): string | null {
   const matches = text.match(/https?:\/\/\S+/gi);

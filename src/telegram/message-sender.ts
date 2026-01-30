@@ -34,7 +34,7 @@ interface StreamState {
 }
 
 const TYPING_INTERVAL_MS = 4000; // Send typing every 4 seconds
-const SPINNER_INTERVAL_MS = 2000; // Spinner animation speed (Telegram limits ~1 edit/sec per message)
+const SPINNER_INTERVAL_MS = 2000; // Spinner animation speed (Telegram rate-limits edits to ~1/sec)
 const MIN_EDIT_INTERVAL_MS = 1500; // Minimum time between message edits to avoid rate limits
 
 export class MessageSender {
