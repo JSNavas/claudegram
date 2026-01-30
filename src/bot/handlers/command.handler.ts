@@ -1484,7 +1484,8 @@ export async function handleTeleport(ctx: Context): Promise<void> {
   }
 
   const projectName = path.basename(session.workingDirectory);
-  const command = `cd "${session.workingDirectory}" && claude --resume ${session.claudeSessionId}`;
+  const claudeBin = config.CLAUDE_EXECUTABLE_PATH || 'claude';
+  const command = `cd "${session.workingDirectory}" && ${claudeBin} --resume ${session.claudeSessionId}`;
 
   const message = `🚀 *Teleport to Terminal*
 
