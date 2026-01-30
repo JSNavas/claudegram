@@ -1,4 +1,5 @@
 import { Bot } from 'grammy';
+import { autoRetry } from '@grammyjs/auto-retry';
 import { config } from '../config.js';
 import { authMiddleware } from './middleware/auth.middleware.js';
 import {
@@ -49,6 +50,14 @@ import { handlePhoto, handleImageDocument } from './handlers/photo.handler.js';
 
 export async function createBot(): Promise<Bot> {
   const bot = new Bot(config.TELEGRAM_BOT_TOKEN);
+
+  // Auto-retry on transient network errors (ECONNRESET, socket hang up, etc.)
+  // Also handles 429 rate limits by respecting Telegram's retry_after
+  bot.api.config.use(autoRetry({
+    maxRetryAttempts: 5,
+    maxDelaySeconds: 60, // Cap retry delay at 60 seconds (will retry sooner rather than wait 900s)
+    rethrowInternalServerErrors: false, // Retry on 5xx errors
+  }));
 
   // Register command menu for autocomplete (non-blocking)
   bot.api.setMyCommands([

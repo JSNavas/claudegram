@@ -34,7 +34,8 @@ interface StreamState {
 }
 
 const TYPING_INTERVAL_MS = 4000; // Send typing every 4 seconds
-const SPINNER_INTERVAL_MS = 150; // Spinner animation speed
+const SPINNER_INTERVAL_MS = 2000; // Spinner animation speed (Telegram limits ~1 edit/sec per message)
+const MIN_EDIT_INTERVAL_MS = 1500; // Minimum time between message edits to avoid rate limits
 
 export class MessageSender {
   private streamStates: Map<number, StreamState> = new Map();
@@ -278,6 +279,12 @@ export class MessageSender {
     // Verify state is still active
     const currentState = this.streamStates.get(state.chatId);
     if (!currentState || currentState !== state || !state.messageId || !state.terminalMode) {
+      return;
+    }
+
+    // Throttle edits to avoid rate limits
+    const timeSinceLastUpdate = Date.now() - state.lastUpdate;
+    if (timeSinceLastUpdate < MIN_EDIT_INTERVAL_MS) {
       return;
     }
 
