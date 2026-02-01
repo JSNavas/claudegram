@@ -4,6 +4,7 @@
 
 **Your personal AI agent, running on your machine, controlled from Telegram.**
 
+[![Website](https://img.shields.io/badge/Website-claudegram.com-00ffd5?logo=googlechrome&logoColor=white)](https://claudegram.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Claude](https://img.shields.io/badge/Claude_Agent_SDK-Anthropic-cc785c?logo=anthropic&logoColor=white)](https://docs.anthropic.com/en/docs/claude-code)
 [![Telegram](https://img.shields.io/badge/Telegram_Bot-Grammy-26a5e4?logo=telegram&logoColor=white)](https://grammy.dev/)
@@ -95,7 +96,7 @@ This is not a simple API wrapper. It's the real Claude Code agent with tool acce
 ### Setup
 
 ```bash
-git clone https://github.com/lliWcWill/claudegram.git
+git clone https://github.com/NachoSEO/claudegram.git
 cd claudegram
 cp .env.example .env
 ```
