@@ -69,35 +69,13 @@ export function detectPlatform(url: string): Platform {
 }
 
 /**
- * Check if a hostname resolves to a private/internal IP range.
- */
-function isPrivateHost(hostname: string): boolean {
-  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return true;
-  const lower = hostname.toLowerCase();
-  if (lower.startsWith('fc') || lower.startsWith('fd') || lower.startsWith('fe80:')) return true;
-  const parts = hostname.split('.').map(Number);
-  if (parts.length === 4 && parts.every(n => !isNaN(n))) {
-    const [a, b] = parts;
-    if (a === 10) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 127) return true;
-    if (a === 0) return true;
-    if (a === 169 && b === 254) return true;
-  }
-  return hostname.endsWith('.local') || hostname.endsWith('.internal');
-}
-
-/**
- * Validate a URL for safe external fetching.
- * Only allows http/https protocols and blocks private/internal hosts to prevent SSRF attacks.
+ * Quick synchronous URL validation for UI purposes.
+ * Checks protocol only - full SSRF protection happens via isUrlAllowed() in extractMedia().
  */
 export function isValidUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
-    if (isPrivateHost(parsed.hostname)) return false;
-    return true;
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
   } catch { return false; }
 }
 
