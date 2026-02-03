@@ -441,24 +441,8 @@ function getProjectRoot(): string {
   return getWorkspaceRoot();
 }
 
-function isWithinRoot(root: string, target: string): boolean {
-  try {
-    // Use realpathSync to resolve symlinks — prevents symlink-based path traversal
-    const resolvedRoot = fs.realpathSync(root);
-    // For target, first check if it exists; if not, use path.resolve
-    let resolvedTarget: string;
-    try {
-      resolvedTarget = fs.realpathSync(target);
-    } catch {
-      // Target doesn't exist yet — normalize path but can't resolve symlinks
-      resolvedTarget = path.resolve(target);
-    }
-    return resolvedTarget === resolvedRoot || resolvedTarget.startsWith(resolvedRoot + path.sep);
-  } catch {
-    // If root doesn't exist, reject
-    return false;
-  }
-}
+// Use shared isPathWithinRoot from workspace-guard for symlink-safe path validation
+const isWithinRoot = isPathWithinRoot;
 
 function listDirectories(dir: string): string[] {
   try {
