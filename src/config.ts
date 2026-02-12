@@ -181,6 +181,20 @@ const envSchema = z.object({
     .string()
     .default('false')
     .transform((val) => val.toLowerCase() === 'true'),
+  // Agent watchdog: detect stuck/unresponsive agent queries
+  AGENT_WATCHDOG_ENABLED: z.string().default('true').transform(toBool),
+  AGENT_WATCHDOG_WARN_SECONDS: z
+    .string()
+    .default('30')
+    .transform((val) => parseInt(val, 10)),
+  AGENT_WATCHDOG_LOG_SECONDS: z
+    .string()
+    .default('10')
+    .transform((val) => parseInt(val, 10)),
+  AGENT_QUERY_TIMEOUT_MS: z
+    .string()
+    .default('0')
+    .transform((val) => parseInt(val, 10)), // 0 = disabled
 });
 
 const parsed = envSchema.safeParse(process.env);

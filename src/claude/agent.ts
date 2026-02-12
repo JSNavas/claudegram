@@ -14,6 +14,15 @@ import * as fs from 'fs';
 import { sessionManager } from './session-manager.js';
 import { setActiveQuery, clearActiveQuery, isCancelled } from './request-queue.js';
 import { config } from '../config.js';
+import { AgentWatchdog } from './agent-watchdog.js';
+import {
+  createAgentTimer,
+  recordMessage,
+  formatDuration,
+  getElapsedMs,
+  getTimingReport,
+  type AgentTimer,
+} from '../utils/agent-timer.js';
 
 export interface AgentUsage {
   inputTokens: number;
@@ -320,6 +329,10 @@ export async function sendToAgent(
   // Determine model to use (default to 'opus' to match getModel() default)
   const effectiveModel = model || chatModels.get(chatId) || 'opus';
 
+  // Initialize timer for tracking query duration (watchdog created inside try with controller)
+  const timer = createAgentTimer();
+  let watchdog: AgentWatchdog | null = null;
+
   try {
     const controller = abortController || new AbortController();
 
@@ -454,15 +467,38 @@ export async function sendToAgent(
     // Store the Query object so /cancel can call interrupt()
     setActiveQuery(chatId, response);
 
+    // Initialize watchdog for long-running query monitoring
+    watchdog = config.AGENT_WATCHDOG_ENABLED
+      ? new AgentWatchdog({
+          chatId,
+          warnAfterSeconds: config.AGENT_WATCHDOG_WARN_SECONDS,
+          logIntervalSeconds: config.AGENT_WATCHDOG_LOG_SECONDS,
+          timeoutMs: config.AGENT_QUERY_TIMEOUT_MS > 0 ? config.AGENT_QUERY_TIMEOUT_MS : undefined,
+          onWarning: (sinceMsg, total) => {
+            logAt('basic', `[Claude] WATCHDOG: No messages for ${formatDuration(sinceMsg)} (total: ${formatDuration(total)}), chat:${chatId}`);
+          },
+          onTimeout: () => {
+            logAt('basic', `[Claude] WATCHDOG: Query timeout reached, aborting chat:${chatId}`);
+            controller.abort();
+          },
+        })
+      : null;
+    watchdog?.start();
+
     // Process response messages
     for await (const responseMessage of response) {
+      // Record activity for watchdog
+      recordMessage(timer);
+      watchdog?.recordActivity(responseMessage.type);
+
       // Check for abort
       if (controller.signal.aborted) {
+        watchdog?.stop();
         fullText = '🛑 Request cancelled.';
         break;
       }
 
-      logAt('trace', '[Claude] Message type:', responseMessage.type);
+      logAt('trace', `[Claude] [${formatDuration(getElapsedMs(timer))}] Message: ${responseMessage.type}`);
 
       if (responseMessage.type === 'assistant') {
         logAt('verbose', '[Claude] Assistant content blocks:', responseMessage.message.content.length);
@@ -480,8 +516,14 @@ export async function sendToAgent(
                 : toolInput.file_path
                   ? String(toolInput.file_path)
                   : '';
-            logAt('verbose', `[Claude] Tool: ${block.name}${inputSummary ? ` → ${inputSummary}` : ''}`);
+            logAt('verbose', `[Claude] [${formatDuration(getElapsedMs(timer))}] Tool: ${block.name}${inputSummary ? ` → ${inputSummary}` : ''}`);
             toolsUsed.push(block.name);
+            // Special logging for Task tool (subagents) - always log at basic level
+            if (block.name === 'Task') {
+              const taskDesc = toolInput.description || toolInput.prompt || 'unnamed task';
+              const subagentType = toolInput.subagent_type || 'unknown';
+              logAt('basic', `[Claude] SUBAGENT START: ${subagentType} — ${String(taskDesc).substring(0, 100)}`);
+            }
             // Notify tool start for terminal UI
             onToolStart?.(block.name, toolInput);
           }
@@ -520,7 +562,9 @@ export async function sendToAgent(
       } else if (responseMessage.type === 'stream_event') {
         logAt('trace', '[Claude] Stream event', responseMessage.event);
       } else if (responseMessage.type === 'result') {
-        logAt('basic', '[Claude] Result:', JSON.stringify(responseMessage, null, 2).substring(0, 500));
+        watchdog?.stop();
+        logAt('basic', `[Claude] Query completed: ${getTimingReport(timer)}`);
+        logAt('verbose', '[Claude] Result:', JSON.stringify(responseMessage, null, 2).substring(0, 500));
         gotResult = true;
 
         // Extract usage data from result
@@ -578,6 +622,7 @@ export async function sendToAgent(
       }
     }
   } catch (error) {
+    watchdog?.stop();
     // If cancelled via /cancel or /reset, return clean message
     if (isCancelled(chatId) || abortController?.signal.aborted) {
       return {
@@ -595,6 +640,7 @@ export async function sendToAgent(
       throw new Error(`Claude error: ${errorMessage}`);
     }
   } finally {
+    watchdog?.stop();
     clearActiveQuery(chatId);
   }
 
