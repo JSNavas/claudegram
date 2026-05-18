@@ -134,5 +134,6 @@ export function setTTSAutoplay(sessionKey: string, autoplay: boolean): void {
 }
 
 export function isTTSEnabled(sessionKey: string): boolean {
+  if (!config.TTS_ENABLED) return false;
   return getTTSSettings(sessionKey).enabled;
 }

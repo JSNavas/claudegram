@@ -266,5 +266,5 @@ export async function generateSpeech(text: string, voice?: string): Promise<Buff
   if (config.TTS_PROVIDER === 'groq') {
     return generateSpeechGroq(text, voice);
   }
-  return generateSpeechOpenAI(text, voice);
+  return generateSpeechOpenAI(text, voice); // openai or openrouter
 }

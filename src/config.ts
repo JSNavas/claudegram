@@ -21,8 +21,9 @@ const envSchema = z.object({
     .default('')
     .transform((val) => val ? val.split(',').map((id) => parseInt(id.trim(), 10)) : []),
   ANTHROPIC_API_KEY: z.string().optional(), // Optional - uses Claude Max subscription if not set
-  // OpenAI (TTS)
+  // OpenAI (TTS + voice transcription)
   OPENAI_API_KEY: z.string().optional(),
+  OPENROUTER_API_KEY: z.string().optional(),
   WORKSPACE_DIR: z.string().default(process.env.HOME || '.'),
   CLAUDE_EXECUTABLE_PATH: z.string().default('claude'),
   CLAUDE_USE_BUNDLED_EXECUTABLE: z
@@ -51,7 +52,7 @@ const envSchema = z.object({
     .transform((val) => parseInt(val, 10)),
   // TTS Configuration
   TTS_ENABLED: z.string().default('true').transform(toBool),
-  TTS_PROVIDER: z.enum(['groq', 'openai']).default('groq'),
+  TTS_PROVIDER: z.enum(['groq', 'openai', 'openrouter']).default('groq'),
   TTS_MODEL: z.string().default('gpt-4o-mini-tts'),
   TTS_VOICE: z.string().default('coral'),
   TTS_INSTRUCTIONS: z.string().default('Speak in a friendly, natural conversational tone.'),
@@ -125,7 +126,7 @@ const envSchema = z.object({
     .string()
     .default('2000')
     .transform((val) => parseInt(val, 10)),
-  // Voice transcription (Groq Whisper)
+  // Voice transcription
   GROQ_API_KEY: z.string().optional(),
   GROQ_TRANSCRIBE_PATH: z.string().default(''),
   TRANSCRIBE_ENABLED: z.string().default('true').transform(toBool),

@@ -64,7 +64,7 @@ This is not a simple API wrapper. It's the real Claude Code agent with tool acce
 <td width="50%" valign="top">
 
 ### Voice & Audio
-- Send a voice note → transcribed via Groq Whisper → fed to Claude
+- Send a voice note → transcribed via Whisper (Groq, OpenAI, or OpenRouter) → fed to Claude
 - `/transcribe` — standalone transcription (reply-to or prompt)
 - `/tts` — agent responses spoken back as Telegram voice notes
 - 13 voices via OpenAI TTS (`gpt-4o-mini-tts`)
@@ -227,12 +227,20 @@ MEDIUM_TIMEOUT_MS=15000
 </details>
 
 <details>
-<summary><strong>Voice Transcription — Groq Whisper</strong></summary>
+<summary><strong>Voice Transcription</strong></summary>
+
+Set `TTS_PROVIDER` to choose your transcription backend:
+
+| Provider | Key needed | Notes |
+|----------|-----------|-------|
+| `groq` | `GROQ_API_KEY` | Free tier, fastest. Get one at [console.groq.com](https://console.groq.com) |
+| `openai` | `OPENAI_API_KEY` | OpenAI Whisper API |
+| `openrouter` | `OPENROUTER_API_KEY` | Routes via OpenRouter (uses Base64 upload) |
 
 ```bash
-# .env
-GROQ_API_KEY=your_groq_key
-GROQ_TRANSCRIBE_PATH=/absolute/path/to/groq_transcribe.py
+# .env — example using Groq
+TTS_PROVIDER=groq
+GROQ_API_KEY=gsk_...
 ```
 
 </details>
@@ -242,7 +250,8 @@ GROQ_TRANSCRIBE_PATH=/absolute/path/to/groq_transcribe.py
 
 ```bash
 # .env
-OPENAI_API_KEY=your_openai_key
+TTS_PROVIDER=openai
+OPENAI_API_KEY=sk-...
 TTS_MODEL=gpt-4o-mini-tts
 TTS_VOICE=coral
 TTS_RESPONSE_FORMAT=opus
@@ -309,9 +318,10 @@ All config lives in `.env`. See [`.env.example`](.env.example) for the full anno
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `GROQ_API_KEY` | — | Groq API key for Whisper |
-| `GROQ_TRANSCRIBE_PATH` | — | Path to `groq_transcribe.py` |
-| `OPENAI_API_KEY` | — | OpenAI API key for TTS |
+| `TTS_PROVIDER` | `groq` | Transcription + TTS provider: `groq`, `openai`, `openrouter` |
+| `GROQ_API_KEY` | — | Groq API key (when `TTS_PROVIDER=groq`) |
+| `OPENAI_API_KEY` | — | OpenAI API key (when `TTS_PROVIDER=openai`) |
+| `OPENROUTER_API_KEY` | — | OpenRouter API key (when `TTS_PROVIDER=openrouter`) |
 | `TTS_VOICE` | `coral` | Default TTS voice |
 | `TTS_MODEL` | `gpt-4o-mini-tts` | TTS model |
 | `VOICE_SHOW_TRANSCRIPT` | `true` | Show transcript text before agent response |
