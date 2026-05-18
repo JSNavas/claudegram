@@ -54,7 +54,9 @@ export async function maybeSendVoiceReply(ctx: Context, text: string): Promise<v
   if (!keyInfo) return;
   const { sessionKey } = keyInfo;
   if (!isTTSEnabled(sessionKey)) return;
-  const hasKey = config.TTS_PROVIDER === 'groq' ? !!config.GROQ_API_KEY : !!config.OPENAI_API_KEY;
+  const hasKey = config.TTS_PROVIDER === 'groq' ? !!config.GROQ_API_KEY
+    : config.TTS_PROVIDER === 'openrouter' ? !!config.OPENROUTER_API_KEY
+    : !!config.OPENAI_API_KEY;
   if (!hasKey) return;
   if (looksLikeError(text)) return;
 
