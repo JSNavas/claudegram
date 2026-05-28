@@ -19,6 +19,23 @@ async function main() {
   await bot.init();
   console.log(`✅ Bot initialized as @${bot.botInfo.username}`);
 
+  // Auto-registrar el webhook contra Telegram en cada arranque. Sin esto, si
+  // la URL pública cambia (ngrok nuevo, sub-path distinto, otro puerto),
+  // Telegram sigue apuntando a la URL vieja → tras fallos consecutivos la
+  // desregistra y el bot deja de recibir nada. Llamar setWebhook al arranque
+  // mantiene Telegram alineado con WEBHOOK_URL del .env como fuente de verdad.
+  if (config.WEBHOOK_URL) {
+    try {
+      await bot.api.setWebhook(config.WEBHOOK_URL);
+      console.log(`🔗 Webhook registered: ${config.WEBHOOK_URL}`);
+    } catch (err) {
+      console.warn(`⚠️  setWebhook failed: ${err instanceof Error ? err.message : err}`);
+      console.warn('   El bot seguirá arrancando, pero Telegram no entregará mensajes hasta que se registre el webhook manualmente.');
+    }
+  } else {
+    console.log('ℹ️  WEBHOOK_URL vacío en .env — saltando auto-setWebhook');
+  }
+
   // Levantamos Express para escuchar las peticiones de Ngrok
   const app = express();
   app.use(express.json());

@@ -12,6 +12,9 @@ const toBool = (val: string) => val.toLowerCase() === 'true';
 
 const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().min(1, 'Telegram bot token is required'),
+  // URL pública del webhook (la registra el bot contra Telegram al arrancar).
+  // Si queda vacía, no se llama a setWebhook — útil si lo configuras a mano.
+  WEBHOOK_URL: z.string().default(''),
   ALLOWED_USER_IDS: z
     .string()
     .min(1, 'At least one allowed user ID is required')
