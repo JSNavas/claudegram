@@ -20,7 +20,7 @@ async function main() {
   console.log(`✅ Bot initialized as @${bot.botInfo.username}`);
 
   // Auto-registrar el webhook contra Telegram en cada arranque. Sin esto, si
-  // la URL pública cambia (ngrok nuevo, sub-path distinto, otro puerto),
+  // la URL pública cambia (dominio del túnel, sub-path distinto, otro puerto),
   // Telegram sigue apuntando a la URL vieja → tras fallos consecutivos la
   // desregistra y el bot deja de recibir nada. Llamar setWebhook al arranque
   // mantiene Telegram alineado con WEBHOOK_URL del .env como fuente de verdad.
@@ -36,13 +36,13 @@ async function main() {
     console.log('ℹ️  WEBHOOK_URL vacío en .env — saltando auto-setWebhook');
   }
 
-  // Levantamos Express para escuchar las peticiones de Ngrok
+  // Levantamos Express para escuchar las peticiones del túnel
   const app = express();
   app.use(express.json());
 
   const PORT = process.env.PORT || 3000;
 
-  // Endpoint donde Telegram/Ngrok enviarán los payloads
+  // Endpoint donde Telegram (vía el túnel) enviará los payloads
   app.post(
     '/webhook',
     webhookCallback(bot, 'express', {
